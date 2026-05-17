@@ -9,6 +9,7 @@ export interface Scene {
 export interface Scenario {
   title: string;
   description: string;
+  hook: string;
   scenes: Scene[];
 }
 

@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 
 import * as gemini from "./server/lib/gemini";
-import * as youtube from "./server/lib/youtube";
 
 dotenv.config();
 
@@ -52,71 +51,6 @@ app.post("/api/generate-scenario", async (req, res) => {
   } catch (error: any) {
     console.error("AI Error:", error);
     res.status(500).json({ error: error.message || "خطا در برقراری ارتباط با هوش مصنوعی" });
-  }
-});
-
-// AI Image Generation
-app.post("/api/generate-image", async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: "پرامپت الزامی است" });
-
-  try {
-    const imageUrl = await gemini.generateImage(prompt);
-    res.json({ imageUrl });
-  } catch (error: any) {
-    console.error("Image Gen Error:", error);
-    res.status(500).json({ error: error.message || "خطا در تولید تصویر" });
-  }
-});
-
-// YouTube Auth URL
-app.get("/api/auth/url", (req, res) => {
-  try {
-    const url = youtube.getAuthUrl();
-    res.json({ url });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// YouTube Auth Callback
-app.get("/auth/callback", async (req, res) => {
-  const { code } = req.query;
-  if (!code) return res.status(400).send("No code provided");
-
-  try {
-    await youtube.setTokens(code as string);
-    res.send(`
-      <html>
-        <body style="background: #0f0f0f; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-          <div style="text-align: center;">
-            <h1 style="color: #ff0000;">✓ متصل شد</h1>
-            <p>می‌توانید این پنجره را ببندید.</p>
-            <script>
-              window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
-              setTimeout(() => window.close(), 2000);
-            </script>
-          </div>
-        </body>
-      </html>
-    `);
-  } catch (error: any) {
-    console.error("Auth Error:", error);
-    res.status(500).send("Authentication failed");
-  }
-});
-
-// YouTube Upload
-app.post("/api/youtube/upload", async (req, res) => {
-  const { videoData, title, description } = req.body;
-  if (!videoData) return res.status(400).json({ error: "دیتا ویدیو الزامی است" });
-
-  try {
-    const videoId = await youtube.uploadToYoutube(videoData, title, description);
-    res.json({ success: true, videoId });
-  } catch (error: any) {
-    console.error("Upload Error:", error);
-    res.status(500).json({ error: error.message || "خطا در آپلود ویدیو" });
   }
 });
 

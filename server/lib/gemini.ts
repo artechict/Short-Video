@@ -13,35 +13,46 @@ const ai = new GoogleGenAI({
 export async function generateScenario(topic: string) {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `شما یک استراتژیست محتوا و نویسنده تخصصی برای یوتیوب شورت هستید.
-    یک سناریوی فوق‌العاده جذاب و کوتاه (حداکثر ۱۵ ثانیه) برای یوتیوب شورت با موضوع "${topic}" بنویسید.
+    contents: `شما یک نابغه در نوشتن فیلم‌نامه‌های یوتیوب شورت هستید که می‌توانید در کمتر از ۱۵ ثانیه مخاطب را جادو کنید.
+    یک سناریوی فوق‌العاده حرفه‌ای و ویروسی (Viral) برای یوتیوب شورت با موضوع "${topic}" بنویسید.
     
-    ساختار سناریو باید اینگونه باشد:
-    ۱. قلاب (Hook): ۳ ثانیه اول باید مخاطب را میخکوب کند (مثلاً با یک سوال عجیب یا بیان یک حقیقت شوکه‌کننده).
-    ۲. بدنه (Body): ۷-۸ ثانیه برای ارائه اطلاعات سریع و مفید.
-    ۳. فراخوان (CTA): ۴-۵ ثانیه پایانی برای ترغیب به سابسکرایب یا لایک.
+    الزامات محتوایی:
+    ۱. قلاب (Hook) مرگبار: در ۳ ثانیه اول باید مخاطب را شوکه کنید یا سوالی بپرسید که نتواند ویدیو را رد کند.
+    ۲. ریتم تند: از کلمات اضافی پرهیز کنید. هر ثانیه باید ارزش داشته باشد.
+    ۳. ساختار ۱۵ ثانیه‌ای: سناریو باید دقیقاً برای یک ویدیوی ۱۵ ثانیه‌ای بهینه شده باشد.
+    ۴. پایان کنجکاو‌کننده: جوری تمام کنید که مخاطب بخواهد ویدیو را دوباره ببیند یا کامنت بگذارد.
     
-    پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای title, description و آرایه scenes (دقیقاً ۳ تا ۵ صحنه) باشد.
-    هر صحنه شامل:
-    - narration (متن گوینده به فارسی)
-    - visual_description (توصیف بصری دقیق به انگلیسی برای تولید تصویر هوش مصنوعی)
-    - onscreen_text (متن کوتاه و جذابی که روی صفحه نمایش داده می‌شود)`,
+    پاسخ را دقیقاً در قالب JSON برگردانید:
+    {
+      "title": "عنوان جذاب ویدیو",
+      "description": "توضیحات کوتاه برای کپشن",
+      "hook": "توضیح استراتژی قلاب شما برای این ویدیو",
+      "scenes": [
+        {
+          "narration": "متن دقیق گوینده (به فارسی روان و عامیانه جذاب)",
+          "visual_suggestion": "پیشنهاد بصری برای این صحنه (English)",
+          "onscreen_text": "متن کوتاهی که باید روی تصویر تایپ شود"
+        }
+      ]
+    }
+    حداقل ۳ و حداکثر ۵ صحنه بنویسید.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
-        required: ["title", "description", "scenes"],
+        required: ["title", "description", "hook", "scenes"],
         properties: {
           title: { type: Type.STRING },
           description: { type: Type.STRING },
+          hook: { type: Type.STRING },
           scenes: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
-              required: ["narration", "visual_description", "onscreen_text"],
+              required: ["narration", "visual_suggestion", "onscreen_text"],
               properties: {
                 narration: { type: Type.STRING },
-                visual_description: { type: Type.STRING },
+                visual_suggestion: { type: Type.STRING },
                 onscreen_text: { type: Type.STRING }
               }
             }
@@ -54,28 +65,4 @@ export async function generateScenario(topic: string) {
   const text = response.text;
   if (!text) throw new Error("No content generated from AI");
   return JSON.parse(text);
-}
-
-export async function generateImage(prompt: string) {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
-    contents: { 
-      parts: [
-        { text: `A vibrant 9:16 portrait cinematic illustration: ${prompt}` }
-      ] 
-    },
-    config: {
-      imageConfig: {
-        aspectRatio: "9:16",
-      }
-    }
-  });
-  
-  for (const part of (response.candidates?.[0]?.content?.parts || [])) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
-    }
-  }
-  
-  throw new Error("تولید تصویر ناموفق بود یا در این مدل پشتیبانی نمی‌شود.");
 }
