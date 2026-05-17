@@ -13,8 +13,19 @@ const ai = new GoogleGenAI({
 export async function generateScenario(topic: string) {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `شما یک نویسنده حرفه ای برای یوتیوب شورت هستید. یک سناریو ۶۰ ثانیه ای برای یوتیوب شورت با موضوع "${topic}" بنویسید.
-    پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای title, description و آرایه scenes (هر صحنه شامل: narration, visual_description (English), onscreen_text) باشد.`,
+    contents: `شما یک استراتژیست محتوا و نویسنده تخصصی برای یوتیوب شورت هستید.
+    یک سناریوی فوق‌العاده جذاب و کوتاه (حداکثر ۱۵ ثانیه) برای یوتیوب شورت با موضوع "${topic}" بنویسید.
+    
+    ساختار سناریو باید اینگونه باشد:
+    ۱. قلاب (Hook): ۳ ثانیه اول باید مخاطب را میخکوب کند (مثلاً با یک سوال عجیب یا بیان یک حقیقت شوکه‌کننده).
+    ۲. بدنه (Body): ۷-۸ ثانیه برای ارائه اطلاعات سریع و مفید.
+    ۳. فراخوان (CTA): ۴-۵ ثانیه پایانی برای ترغیب به سابسکرایب یا لایک.
+    
+    پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای title, description و آرایه scenes (دقیقاً ۳ تا ۵ صحنه) باشد.
+    هر صحنه شامل:
+    - narration (متن گوینده به فارسی)
+    - visual_description (توصیف بصری دقیق به انگلیسی برای تولید تصویر هوش مصنوعی)
+    - onscreen_text (متن کوتاه و جذابی که روی صفحه نمایش داده می‌شود)`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {

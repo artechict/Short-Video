@@ -22,8 +22,8 @@ export const InputSection: React.FC<Props> = ({ topic, setTopic, onGenerate, loa
       <h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">
         ایده‌ها را به ویدیو تبدیل کنید
       </h2>
-      <p className="text-gray-400 mb-8 max-w-md text-lg">
-        موضوع خود را وارد کنید تا هوش مصنوعی سناریو، متن گوینده و تصاویر یوتیوب شورت شما را بسازد.
+      <p className="text-gray-400 mb-8 max-w-lg text-lg">
+        فقط کافیه موضوع رو بگی؛ هوش مصنوعی یک سناریوی ۱۵ ثانیه‌ای با «قلاب داستانی» قوی برات می‌نویسه که مخاطب رو تا انتها نگه داره.
       </p>
       
       <div className="w-full max-w-2xl relative group">
