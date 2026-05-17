@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
 
 import { Scenario, Scene } from './types.ts';
-import { aiService } from './services/ai.ts';
+import { aiService } from './services/api.ts';
 
 import { Header } from './components/Header.tsx';
 import { InputSection } from './components/InputSection.tsx';
