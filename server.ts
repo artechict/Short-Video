@@ -54,28 +54,26 @@ app.get("/api/health", (req, res) => {
 });
 
 // 1. Generate Scenario (Script)
-// Use .all and check method manually to debug 405
-app.all("/api/generate-scenario", async (req, res) => {
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: `Method ${req.method} not allowed. Use POST.` });
+app.post("/api/generate-scenario", async (req, res) => {
+  const { topic } = req.body;
+  console.log(`POST /api/generate-scenario - Topic: ${topic}`);
+  
+  if (!topic) {
+    return res.status(400).json({ error: "Topic is required" });
   }
 
-  const { topic } = req.body;
-  console.log(`Generating scenario for topic: ${topic}`);
-  if (!topic) return res.status(400).json({ error: "Topic is required" });
-
   try {
+    console.log("Calling Gemini for scenario...");
     const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `شما یک نویسنده حرفه ای برای یوتیوب شورت هستید. یک سناریو ۶۰ ثانیه ای برای یوتیوب شورت با موضوع "${topic}" بنویسید.
+      model: "gemini-2.0-flash",
+      contents: [{ role: "user", parts: [{ text: `شما یک نویسنده حرفه ای برای یوتیوب شورت هستید. یک سناریو ۶۰ ثانیه ای برای یوتیوب شورت با موضوع "${topic}" بنویسید.
       پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای زیر باشد:
       - title: عنوان ویدیو (فارسی)
       - description: توضیحات ویدیو برای یوتیوب (فارسی)
       - scenes: آرایه ای از ۵ صحنه، هر کدام شامل:
         - narration: متنی که گوینده باید بگوید (فارسی)
         - visual_description: توصیف دقیق تصویر برای تولید تصویر (انگلیسی)
-        - onscreen_text: متنی که باید روی صفحه نمایش داده شود (فارسی کوتاه)`,
+        - onscreen_text: متنی که باید روی صفحه نمایش داده شود (فارسی کوتاه)` }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -102,6 +100,8 @@ app.all("/api/generate-scenario", async (req, res) => {
     });
 
     const text = result.text;
+    console.log("Gemini response received");
+
     if (!text) {
       throw new Error("مدل هیچ پاسخی تولید نکرد (احتمالاً به دلیل فیلترهای ایمنی)");
     }
@@ -114,7 +114,7 @@ app.all("/api/generate-scenario", async (req, res) => {
     }
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Unknown error during script generation" });
   }
 });
 
@@ -124,13 +124,8 @@ app.post("/api/generate-image", async (req, res) => {
   console.log(`Generating image for: ${prompt}`);
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: [{ text: `A vibrant, high-quality cinematic illustration of: ${prompt}. Aspect ratio 9:16 for YouTube Shorts.` }],
-      config: {
-        imageConfig: {
-          aspectRatio: "9:16"
-        }
-      }
+      model: 'gemini-2.0-flash',
+      contents: [{ role: "user", parts: [{ text: `A vibrant, high-quality cinematic illustration of: ${prompt}. Aspect ratio 9:16 for YouTube Shorts.` }] }]
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -222,6 +217,12 @@ app.post("/api/youtube/upload", async (req, res) => {
     console.error("Upload Error:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Catch-all for undefined API routes
+app.all("/api/*", (req, res) => {
+  console.log(`Mismatch API route: ${req.method} ${req.url}`);
+  res.status(404).json({ error: "API route not found" });
 });
 
 // --- VITE MIDDLEWARE ---
