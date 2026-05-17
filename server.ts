@@ -11,8 +11,14 @@ import { Readable } from "stream";
 dotenv.config();
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
 app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 const PORT = 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -38,16 +44,25 @@ let userTokens: any = null;
 // --- API ROUTES ---
 
 app.get("/api/health", (req, res) => {
+  console.log("Health check hit");
   res.json({ 
     status: "ok", 
     hasApiKey: !!process.env.GEMINI_API_KEY,
-    env: process.env.NODE_ENV || "development"
+    env: process.env.NODE_ENV || "development",
+    time: new Date().toISOString()
   });
 });
 
 // 1. Generate Scenario (Script)
-app.post("/api/generate-scenario", async (req, res) => {
+// Use .all and check method manually to debug 405
+app.all("/api/generate-scenario", async (req, res) => {
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: `Method ${req.method} not allowed. Use POST.` });
+  }
+
   const { topic } = req.body;
+  console.log(`Generating scenario for topic: ${topic}`);
   if (!topic) return res.status(400).json({ error: "Topic is required" });
 
   try {
@@ -106,6 +121,7 @@ app.post("/api/generate-scenario", async (req, res) => {
 // 2. Generate Image for a scene
 app.post("/api/generate-image", async (req, res) => {
   const { prompt } = req.body;
+  console.log(`Generating image for: ${prompt}`);
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
