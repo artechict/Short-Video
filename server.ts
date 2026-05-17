@@ -30,32 +30,28 @@ app.use((req, res, next) => {
 // Explicit OPTIONS handler for CORS preflight
 app.options('*', cors());
 
-// --- API ROUTES ---
+// --- API ROUTES FIRST ---
 
-app.get("/api/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
-});
-
-// AI Scenario Generation
 app.post("/api/generate-scenario", async (req, res) => {
+  console.log(`[API] Topic received: ${req.body?.topic}`);
   const { topic } = req.body;
-  if (!topic) return res.status(400).json({ error: "موضوع الزامی است" });
+  if (!topic) return res.status(400).json({ error: "شما موضوعی وارد نکردید" });
 
   try {
     const data = await gemini.generateScenario(topic);
     res.json(data);
   } catch (error: any) {
     console.error("AI Error:", error);
-    res.status(500).json({ error: error.message || "خطا در برقراری ارتباط با هوش مصنوعی" });
+    res.status(500).json({ error: "متأسفانه در تولید سناریو مشکلی پیش آمد. دوباره تلاش کنید." });
   }
 });
 
-// Catch-all API routes (404 for API only)
-app.all("/api/*", (req, res) => {
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", time: new Date().toISOString(), server: "Express" });
+});
+
+// Catch-all 404 for other API routes
+app.all("/api/*", cors(), (req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "ShortGen AI",
-  "description": "برنامه خودکار برای ساخت ویدیوهای کوتاه یوتیوب از روی موضوع با استفاده از هوش مصنوعی",
+  "description": "تولید خودکار سناریوهای ویروسی ۱۵ ثانیه‌ای برای یوتیوب شورت با تمرکز بر قلاب داستانی و جذب مخاطب",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

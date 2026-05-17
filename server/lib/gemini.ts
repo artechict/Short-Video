@@ -1,7 +1,4 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -11,9 +8,7 @@ const ai = new GoogleGenAI({
 });
 
 export async function generateScenario(topic: string) {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `شما یک نابغه در نوشتن فیلم‌نامه‌های یوتیوب شورت هستید که می‌توانید در کمتر از ۱۵ ثانیه مخاطب را جادو کنید.
+  const prompt = `شما یک نابغه در نوشتن فیلم‌نامه‌های یوتیوب شورت هستید که می‌توانید در کمتر از ۱۵ ثانیه مخاطب را جادو کنید.
     یک سناریوی فوق‌العاده حرفه‌ای و ویروسی (Viral) برای یوتیوب شورت با موضوع "${topic}" بنویسید.
     
     الزامات محتوایی:
@@ -35,7 +30,11 @@ export async function generateScenario(topic: string) {
         }
       ]
     }
-    حداقل ۳ و حداکثر ۵ صحنه بنویسید.`,
+    حداقل ۳ و حداکثر ۵ صحنه بنویسید.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: prompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
