@@ -60,6 +60,12 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic }),
       });
+      
+      if (!scriptRes.ok) {
+        const errorText = await scriptRes.text();
+        throw new Error(`خطا در تولید سناریو: ${scriptRes.status} ${errorText}`);
+      }
+      
       const data: Scenario = await scriptRes.json();
       
       // 2. Generate Images for each scene
@@ -71,6 +77,14 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: scene.visual_description }),
         });
+
+        if (!imgRes.ok) {
+          const errorText = await imgRes.text();
+          console.error('Image Generation Error:', errorText);
+          // Fallback to a placeholder or skip if needed, but here we throw to be safe
+          throw new Error(`خطا در تولید تصویر: ${imgRes.status} ${errorText}`);
+        }
+
         const { imageUrl } = await imgRes.json();
         scenesWithImages.push({ ...scene, imageUrl });
       }

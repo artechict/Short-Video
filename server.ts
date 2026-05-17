@@ -37,13 +37,21 @@ let userTokens: any = null;
 
 // --- API ROUTES ---
 
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    hasApiKey: !!process.env.GEMINI_API_KEY,
+    env: process.env.NODE_ENV || "development"
+  });
+});
+
 // 1. Generate Scenario (Script)
 app.post("/api/generate-scenario", async (req, res) => {
   const { topic } = req.body;
   if (!topic) return res.status(400).json({ error: "Topic is required" });
 
   try {
-    const response = await ai.models.generateContent({
+    const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `شما یک نویسنده حرفه ای برای یوتیوب شورت هستید. یک سناریو ۶۰ ثانیه ای برای یوتیوب شورت با موضوع "${topic}" بنویسید.
       پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای زیر باشد:
@@ -78,7 +86,17 @@ app.post("/api/generate-scenario", async (req, res) => {
       }
     });
 
-    res.json(JSON.parse(response.text));
+    const text = result.text;
+    if (!text) {
+      throw new Error("مدل هیچ پاسخی تولید نکرد (احتمالاً به دلیل فیلترهای ایمنی)");
+    }
+
+    try {
+      res.json(JSON.parse(text));
+    } catch (parseError) {
+      console.error("JSON Parse Error. Raw text:", text);
+      res.status(500).json({ error: "خطا در پردازش پاسخ هوش مصنوعی", rawText: text });
+    }
   } catch (error: any) {
     console.error("Gemini Error:", error);
     res.status(500).json({ error: error.message });
