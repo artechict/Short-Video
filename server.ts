@@ -1,83 +1,66 @@
 import express from "express";
 import path from "path";
 import cors from "cors";
+import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
-import dotenv from "dotenv";
 import { Readable } from "stream";
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-
-// Logging middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
-
 const PORT = 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const ai = new GoogleGenAI({
+// Init Gemini
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ai = new GoogleGenAI({ 
   apiKey: GEMINI_API_KEY!,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
+  httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
 });
 
-// YouTube OAuth Setup
+// YouTube OAuth
 const oauth2Client = new OAuth2Client(
   process.env.YOUTUBE_CLIENT_ID,
   process.env.YOUTUBE_CLIENT_SECRET,
   `${process.env.APP_URL}/auth/callback`
 );
-
 let userTokens: any = null;
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+// Professional Logging
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    console.log(`[API LOG] ${new Date().toLocaleTimeString()} ${req.method} ${req.url}`);
+  }
+  next();
+});
 
 // --- API ROUTES ---
 
 app.get("/api/health", (req, res) => {
-  console.log("Health check hit");
-  res.json({ 
-    status: "ok", 
-    hasApiKey: !!process.env.GEMINI_API_KEY,
-    env: process.env.NODE_ENV || "development",
-    time: new Date().toISOString()
-  });
+  res.json({ status: "ok", uptime: process.uptime() });
 });
 
-// 1. Generate Scenario (Script)
+// 1. Generate Scenario
 app.post("/api/generate-scenario", async (req, res) => {
   const { topic } = req.body;
-  console.log(`POST /api/generate-scenario - Topic: ${topic}`);
-  
-  if (!topic) {
-    return res.status(400).json({ error: "Topic is required" });
-  }
+  if (!topic) return res.status(400).json({ error: "موضوع الزامی است" });
 
   try {
-    console.log("Calling Gemini for scenario...");
-    const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [{ role: "user", parts: [{ text: `شما یک نویسنده حرفه ای برای یوتیوب شورت هستید. یک سناریو ۶۰ ثانیه ای برای یوتیوب شورت با موضوع "${topic}" بنویسید.
-      پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای زیر باشد:
-      - title: عنوان ویدیو (فارسی)
-      - description: توضیحات ویدیو برای یوتیوب (فارسی)
-      - scenes: آرایه ای از ۵ صحنه، هر کدام شامل:
-        - narration: متنی که گوینده باید بگوید (فارسی)
-        - visual_description: توصیف دقیق تصویر برای تولید تصویر (انگلیسی)
-        - onscreen_text: متنی که باید روی صفحه نمایش داده شود (فارسی کوتاه)` }] }],
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `شما یک نویسنده حرفه ای برای یوتیوب شورت هستید. یک سناریو ۶۰ ثانیه ای برای یوتیوب شورت با موضوع "${topic}" بنویسید.
+      پاسخ را دقیقاً در قالب JSON برگردانید که شامل فیلدهای title, description و آرایه scenes (هر صحنه شامل: narration, visual_description (English), onscreen_text) باشد.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
+          required: ["title", "description", "scenes"],
           properties: {
             title: { type: Type.STRING },
             description: { type: Type.STRING },
@@ -85,62 +68,47 @@ app.post("/api/generate-scenario", async (req, res) => {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
+                required: ["narration", "visual_description", "onscreen_text"],
                 properties: {
                   narration: { type: Type.STRING },
                   visual_description: { type: Type.STRING },
                   onscreen_text: { type: Type.STRING }
-                },
-                required: ["narration", "visual_description", "onscreen_text"]
+                }
               }
             }
-          },
-          required: ["title", "description", "scenes"]
+          }
         }
       }
     });
 
-    const text = result.text;
-    console.log("Gemini response received");
-
-    if (!text) {
-      throw new Error("مدل هیچ پاسخی تولید نکرد (احتمالاً به دلیل فیلترهای ایمنی)");
-    }
-
-    try {
-      res.json(JSON.parse(text));
-    } catch (parseError) {
-      console.error("JSON Parse Error. Raw text:", text);
-      res.status(500).json({ error: "خطا در پردازش پاسخ هوش مصنوعی", rawText: text });
-    }
+    res.json(JSON.parse(response.text));
   } catch (error: any) {
-    console.error("Gemini Error:", error);
-    res.status(500).json({ error: error.message || "Unknown error during script generation" });
-  }
-});
-
-// 2. Generate Image for a scene
-app.post("/api/generate-image", async (req, res) => {
-  const { prompt } = req.body;
-  console.log(`Generating image for: ${prompt}`);
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: [{ role: "user", parts: [{ text: `A vibrant, high-quality cinematic illustration of: ${prompt}. Aspect ratio 9:16 for YouTube Shorts.` }] }]
-    });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return res.json({ imageUrl: `data:image/png;base64,${part.inlineData.data}` });
-      }
-    }
-    res.status(500).json({ error: "No image generated" });
-  } catch (error: any) {
-    console.error("Image Gen Error:", error);
+    console.error("AI Scenario Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. YouTube Auth URL
+// 2. Generate Image
+app.post("/api/generate-image", async (req, res) => {
+  const { prompt } = req.body;
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: [{ text: `High quality cinematic 9:16 portrait: ${prompt}` }],
+      config: { imageConfig: { aspectRatio: "9:16" } }
+    });
+
+    const part = (response.candidates?.[0]?.content?.parts || []).find(p => p.inlineData);
+    if (part?.inlineData) {
+      return res.json({ imageUrl: `data:image/png;base64,${part.inlineData.data}` });
+    }
+    throw new Error("No image generated");
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. YouTube Auth
 app.get("/api/auth/url", (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -150,100 +118,63 @@ app.get("/api/auth/url", (req, res) => {
   res.json({ url });
 });
 
-// 4. Auth Callback
 app.get("/auth/callback", async (req, res) => {
   const { code } = req.query;
   try {
     const { tokens } = await oauth2Client.getToken(code as string);
     userTokens = tokens;
-    res.send(`
-      <html>
-        <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f0f2f5;">
-          <div style="text-align: center; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <h2 style="color: #4CAF50;">اتصال با موفقیت انجام شد!</h2>
-            <p>این پنجره به طور خودکار بسته خواهد شد.</p>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
-                window.close();
-              }
-            </script>
-          </div>
-        </body>
-      </html>
-    `);
+    res.send(`<html><body><script>window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');window.close();</script></body></html>`);
   } catch (error) {
-    res.status(500).send("Authentication failed");
+    res.status(500).send("Auth fail");
   }
 });
 
-// 5. Upload to YouTube
+// 4. YouTube Upload
 app.post("/api/youtube/upload", async (req, res) => {
   if (!userTokens) return res.status(401).json({ error: "Not authenticated" });
-  const { videoData, title, description } = req.body; // videoData is base64
+  const { videoData, title, description } = req.body;
   
   try {
     oauth2Client.setCredentials(userTokens);
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
-    
-    // Convert base64 to buffer
     const buffer = Buffer.from(videoData.split(',')[1], 'base64');
     const readableStream = new Readable();
     readableStream._read = () => {};
     readableStream.push(buffer);
     readableStream.push(null);
 
-    const response = await youtube.videos.insert({
+    const result = await youtube.videos.insert({
       part: ['snippet', 'status'],
       requestBody: {
-        snippet: {
-          title,
-          description,
-          categoryId: '22', // People & Blogs
-          tags: ['shorts', 'ai', 'generated']
-        },
-        status: {
-          privacyStatus: 'public', // Defaulting to public as requested
-          selfDeclaredMadeForKids: false
-        }
+        snippet: { title, description, categoryId: '22' },
+        status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
       },
-      media: {
-        body: readableStream
-      }
+      media: { body: readableStream }
     });
-
-    res.json({ success: true, videoId: response.data.id });
+    res.json({ success: true, videoId: result.data.id });
   } catch (error: any) {
-    console.error("Upload Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Catch-all for undefined API routes
+// API Error Handler
 app.all("/api/*", (req, res) => {
-  console.log(`Mismatch API route: ${req.method} ${req.url}`);
-  res.status(404).json({ error: "API route not found" });
+  res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
 });
 
 // --- VITE MIDDLEWARE ---
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    app.use(express.static(path.join(process.cwd(), 'dist')));
+    app.get('*', (req, res) => res.sendFile(path.join(process.cwd(), 'dist', 'index.html')));
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server ready at http://0.0.0.0:${PORT}`);
   });
 }
 

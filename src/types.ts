@@ -3,6 +3,7 @@ export interface Scene {
   visual_description: string;
   onscreen_text: string;
   imageUrl?: string;
+  isGeneratingImage?: boolean;
 }
 
 export interface Scenario {
