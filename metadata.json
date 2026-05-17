@@ -1,0 +1,6 @@
+{
+  "name": "ShortGen AI",
+  "description": "برنامه خودکار برای ساخت ویدیوهای کوتاه یوتیوب از روی موضوع با استفاده از هوش مصنوعی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
