@@ -12,4 +12,6 @@ export interface Scenario {
   scenes: Scene[];
 }
 
+export type AppState = 'input' | 'editor' | 'preview';
+
 export type GenerationStatus = 'idle' | 'generating_script' | 'generating_images' | 'assembling_video' | 'uploading' | 'completed' | 'error';

@@ -15,8 +15,12 @@ const PORT = 3000;
 
 // Init Gemini
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.warn("⚠️ GEMINI_API_KEY match not found in environment. AI features will fail.");
+}
+
 const ai = new GoogleGenAI({ 
-  apiKey: GEMINI_API_KEY!,
+  apiKey: GEMINI_API_KEY || "empty",
   httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
 });
 
@@ -24,7 +28,7 @@ const ai = new GoogleGenAI({
 const oauth2Client = new OAuth2Client(
   process.env.YOUTUBE_CLIENT_ID,
   process.env.YOUTUBE_CLIENT_SECRET,
-  `${process.env.APP_URL}/auth/callback`
+  `${process.env.APP_URL || 'http://localhost:3000'}/auth/callback`
 );
 let userTokens: any = null;
 
@@ -35,7 +39,7 @@ app.use(express.json({ limit: '50mb' }));
 // Professional Logging
 app.use((req, res, next) => {
   if (req.url.startsWith('/api')) {
-    console.log(`[API LOG] ${new Date().toLocaleTimeString()} ${req.method} ${req.url}`);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   }
   next();
 });
@@ -43,7 +47,12 @@ app.use((req, res, next) => {
 // --- API ROUTES ---
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
+  res.json({ 
+    status: "ok", 
+    uptime: process.uptime(),
+    hasApiKey: !!GEMINI_API_KEY,
+    nodeEnv: process.env.NODE_ENV
+  });
 });
 
 // 1. Generate Scenario
@@ -81,7 +90,11 @@ app.post("/api/generate-scenario", async (req, res) => {
       }
     });
 
-    res.json(JSON.parse(response.text));
+    // Use .text property as per skill guidance
+    const contentText = response.text;
+    if (!contentText) throw new Error("No content generated");
+    
+    res.json(JSON.parse(contentText));
   } catch (error: any) {
     console.error("AI Scenario Error:", error);
     res.status(500).json({ error: error.message });
@@ -94,21 +107,26 @@ app.post("/api/generate-image", async (req, res) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: [{ text: `High quality cinematic 9:16 portrait: ${prompt}` }],
-      config: { imageConfig: { aspectRatio: "9:16" } }
+      contents: [{ text: `High quality cinematic portrait for vertical video: ${prompt}` }],
+      config: { 
+        imageConfig: { 
+          aspectRatio: "9:16" 
+        } 
+      }
     });
 
     const part = (response.candidates?.[0]?.content?.parts || []).find(p => p.inlineData);
     if (part?.inlineData) {
       return res.json({ imageUrl: `data:image/png;base64,${part.inlineData.data}` });
     }
-    throw new Error("No image generated");
+    throw new Error("تولید تصویر ناموفق بود. لطفاً دوباره تلاش کنید.");
   } catch (error: any) {
+    console.error("Image Gen Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. YouTube Auth
+// YouTube Auth
 app.get("/api/auth/url", (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -129,35 +147,6 @@ app.get("/auth/callback", async (req, res) => {
   }
 });
 
-// 4. YouTube Upload
-app.post("/api/youtube/upload", async (req, res) => {
-  if (!userTokens) return res.status(401).json({ error: "Not authenticated" });
-  const { videoData, title, description } = req.body;
-  
-  try {
-    oauth2Client.setCredentials(userTokens);
-    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
-    const buffer = Buffer.from(videoData.split(',')[1], 'base64');
-    const readableStream = new Readable();
-    readableStream._read = () => {};
-    readableStream.push(buffer);
-    readableStream.push(null);
-
-    const result = await youtube.videos.insert({
-      part: ['snippet', 'status'],
-      requestBody: {
-        snippet: { title, description, categoryId: '22' },
-        status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
-      },
-      media: { body: readableStream }
-    });
-    res.json({ success: true, videoId: result.data.id });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// API Error Handler
 app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
 });
@@ -169,8 +158,9 @@ async function startServer() {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(process.cwd(), 'dist')));
-    app.get('*', (req, res) => res.sendFile(path.join(process.cwd(), 'dist', 'index.html')));
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
   app.listen(PORT, "0.0.0.0", () => {
